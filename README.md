@@ -2,191 +2,76 @@
 
 ## Sobre o Projeto
 
-Este projeto documenta a refatoração de um sistema legado de pipeline de CI/CD. O trabalho envolveu identificar problemas no código original e aplicar técnicas de refatoração para melhorar clareza, testabilidade e manutenibilidade.
+Este projeto documenta a refatoração de um sistema legado de pipeline de CI/CD escrito em Java. O código original apresentava problemas de clareza, duplicação e baixa coesão, dificultando manutenção e evolução.
 
-### Análise do Código Original
+### Problemas Identificados
 
-O código inicial apresentava problemas comuns em sistemas legados:
-- Método `run()` com múltiplas responsabilidades e lógica aninhada
-- Uso repetido de strings literais "success" e "failure" 
-- Classe única responsável por testes, deployment e notificações
-- Ausência de testes automatizados (apenas placeholder com TODO)
-- Dificuldade para entender e estender o comportamento
+- Método run() complexo com ~50 linhas e lógica aninhada
+- Strings literais "success" e "failure" repetidas em vários pontos
+- Classe Pipeline acumulando múltiplas responsabilidades
+- Ausência de testes automatizados
+- Falta de documentação
 
-## Objetivos da Refatoração
+### Objetivos
 
-1. Extrair métodos e usar variáveis com nomes mais claros
-2. Eliminar duplicação de código e strings mágicas
-3. Separar responsabilidades em classes distintas
-4. Implementar suite de testes automatizados
-5. Documentar o código adequadamente
+Aplicar técnicas de refatoração para melhorar qualidade, testabilidade e manutenibilidade do código, utilizando princípios SOLID e Clean Code.
 
-## Melhorias Implementadas
+## Refatorações Realizadas
 
-### 1. Extração de Enum para Resultados (PipelineResult)
+### Eliminação de Magic Strings
 
-**Problema**: Strings mágicas "success" e "failure" espalhadas pelo código.
+Criado o enum PipelineResult para substituir strings literais "success" e "failure", trazendo type safety e eliminando possíveis erros de digitação.
 
-**Solução**: Criação do enum `PipelineResult` com métodos auxiliares:
-```java
-public enum PipelineResult {
-    SUCCESS, FAILURE;
-    
-    public static PipelineResult fromString(String value);
-    public boolean isSuccess();
-    public boolean isFailure();
-}
-```
+### Encapsulamento de Resultados
 
-**Vantagens dessa abordagem**:
-- Segurança de tipos em tempo de compilação
-- Código mais legível com métodos como `isSuccess()`
-- Mais fácil adicionar novos estados no futuro
+A classe PipelineExecutionResult foi criada para agrupar os resultados da execução (testes e deployment) e centralizar a lógica de geração de mensagens de email.
 
-### 2. Encapsulamento de Resultados (PipelineExecutionResult)
+### Separação de Responsabilidades
 
-**Problema**: Status de testes e deployment espalhados em variáveis boolean.
+A classe Pipeline foi dividida em três classes especializadas:
+- TestRunner: executa testes e registra resultados
+- Deployer: gerencia o deployment (só executa se testes passarem)
+- EmailNotifier: cuida das notificações por email
 
-**Solução**: Criação da classe `PipelineExecutionResult` que encapsula os resultados da execução e centraliza a lógica para gerar mensagens de email baseadas no contexto.
+### Simplificação do Código
 
-**Vantagens dessa abordagem**:
-- Dados relacionados agrupados em um único objeto
-- Lógica de decisão de mensagens em local único
-- Facilita testes isolados dessa funcionalidade
+O método run() foi reduzido de ~50 linhas para 4 linhas, funcionando apenas como orquestrador que delega responsabilidades. O fluxo do pipeline ficou claro e autoexplicativo.
 
-### 3. Separação de Responsabilidades (TestRunner, Deployer, EmailNotifier)
+### Testes Automatizados
 
-**Problema**: Classe `Pipeline` com múltiplas responsabilidades.
+Foram implementados 24 testes (9 de integração e 15 unitários) cobrindo todos os cenários possíveis. Os testes garantiram que o comportamento original foi preservado durante toda a refatoração.
 
-**Solução**: Criação de três classes especializadas:
+### Documentação
 
-**TestRunner**: Responsável por executar testes e logar resultados. Trata o caso especial de projetos sem testes.
+Todas as classes e métodos públicos foram documentados com Javadoc em português.
 
-**Deployer**: Gerencia o processo de deployment. Implementa a regra de negócio que impede deployment quando os testes falham.
+## Resultados
 
-**EmailNotifier**: Lida com notificações por email. Verifica a configuração antes de enviar.
+O código foi reorganizado em 5 classes: Pipeline (orquestrador), TestRunner, Deployer e EmailNotifier (classes especializadas), além de PipelineResult (enum) e PipelineExecutionResult (value object).
 
-**Vantagens dessa separação**:
-- Cada classe tem responsabilidade única e bem definida
-- Testes podem ser feitos isoladamente
-- Mais fácil adicionar novos tipos de notificação no futuro
-- Código mais modular e reutilizável
-
-### 4. Simplificação da Classe Pipeline
-
-Com a extração das classes especializadas, o método `run()` foi reduzido de aproximadamente 50 linhas para apenas 4 linhas:
-
-```java
-public void run(Project project) {
-    boolean testsPassed = testRunner.executeTests(project);
-    boolean deploySuccessful = deployer.deploy(project, testsPassed);
-    
-    PipelineExecutionResult executionResult = 
-        new PipelineExecutionResult(testsPassed, deploySuccessful);
-    emailNotifier.notifyIfEnabled(executionResult);
-}
-```
-
-O código agora funciona como orquestrador, delegando cada responsabilidade para a classe apropriada. O fluxo do pipeline ficou explícito e fácil de entender.
-
-### 5. Suite Completa de Testes
-
-O projeto original tinha apenas um teste vazio (TODO). Foram implementados 24 testes cobrindo diferentes cenários:
-
-**Testes de Integração (PipelineTest - 9 testes)**:
-- Execução completa com testes passando e deployment bem-sucedido
-- Falha nos testes (deployment não deve acontecer)
-- Deployment falhando após testes passarem
-- Projeto sem testes
-- Diferentes configurações de email (habilitado/desabilitado)
-
-**Testes Unitários**:
-- TestRunnerTest (3 testes) - execução de testes
-- DeployerTest (3 testes) - lógica de deployment
-- PipelineExecutionResultTest (5 testes) - geração de mensagens
-- PipelineResultTest (4 testes) - conversão de strings e casos extremos
-
-Esses testes foram fundamentais para garantir que o comportamento original foi preservado durante toda a refatoração.
-
-### 6. Documentação com Javadoc
-
-Todas as classes públicas e métodos foram documentados com Javadoc, incluindo propósito, parâmetros, valores de retorno e comportamentos especiais. Isso facilita o entendimento do código e permite que IDEs exibam a documentação automaticamente.
-
-## Comparação: Antes vs Depois
-
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Número de classes | 1 | 5 |
-| Linhas no método run() | ~50 | 4 |
-| Testes automatizados | 1 (vazio) | 24 |
-| Strings mágicas | 6+ | 0 |
-| Responsabilidades por classe | 4 | 1 |
-| Javadoc | 0 linhas | ~80 linhas |
-
-## Arquitetura Resultante
-
-```
-Pipeline (Orchestrator)
-  ├── TestRunner (execução de testes)
-  ├── Deployer (lógica de deployment)
-  └── EmailNotifier (notificações)
-
-Classes de Suporte:
-  ├── PipelineResult (enum para resultados)
-  └── PipelineExecutionResult (encapsulamento de resultados)
-```
+A complexidade do método principal foi reduzida de ~50 linhas para 4 linhas. Foram criados 24 testes automatizados garantindo cobertura completa. Todas as strings mágicas foram eliminadas e o código foi totalmente documentado.
 
 ## Executando os Testes
 
+Para executar todos os testes:
 ```bash
-# Compilar e executar todos os testes
 mvn test
-
-# Limpar e testar
-mvn clean test
-
-# Executar um teste específico
-mvn test -Dtest=PipelineTest
 ```
 
-## Tecnologias Utilizadas
+## Tecnologias
 
 - Java 21
-- JUnit 5 (framework de testes)
-- AssertJ (assertions fluentes)
-- Mockito (mocks para testes)
-- Maven (gerenciamento de dependências e build)
+- JUnit 5
+- AssertJ
+- Mockito
+- Maven
 
-## Princípios de Design Aplicados
+## Princípios Aplicados
 
-**SOLID**:
-- Single Responsibility: Cada classe tem uma responsabilidade específica
-- Open/Closed: Estrutura permite extensão sem modificar código existente
-- Liskov Substitution: Interfaces bem definidas
-- Interface Segregation: Interfaces coesas sem métodos desnecessários
-- Dependency Inversion: Dependências via interfaces (Logger, Emailer, Config)
+Foram aplicados os princípios SOLID (Single Responsibility, Open/Closed, Dependency Inversion) e práticas de Clean Code (nomes descritivos, métodos pequenos, eliminação de duplicação).
 
-**Clean Code**:
-- Nomes descritivos que expressam intenção
-- Métodos pequenos focados em uma tarefa
-- Eliminação de duplicação
-- Javadoc para documentação
-- Código autoexplicativo
-
-## Principais Aprendizados
-
-Durante este trabalho de refatoração, alguns pontos se mostraram particularmente importantes:
-
-A refatoração incremental (pequenas mudanças validadas por testes) é mais segura que grandes reescritas. Escrever testes antes de refatorar foi essencial para preservar o comportamento original.
-
-A extração de classes especializadas resolveu o problema de múltiplas responsabilidades de forma elegante. O uso de enums no lugar de strings literais eliminou uma categoria inteira de possíveis erros.
-
-O encapsulamento de dados relacionados em value objects (como PipelineExecutionResult) melhorou significativamente a coesão do código.
-
-## Autor
-
-Trabalho desenvolvido para a disciplina de Engenharia de Software.
+A refatoração incremental com validação constante por testes mostrou-se mais segura que grandes reescritas. A extração de classes especializadas e o uso de enums eliminaram categorias inteiras de possíveis erros.
 
 ## Referências
 
-Este projeto é baseado no [BuildPipeline-Refactoring-Kata](https://github.com/emilybache/BuildPipeline-Refactoring-Kata) de Emily Bache.
+Baseado no [BuildPipeline-Refactoring-Kata](https://github.com/emilybache/BuildPipeline-Refactoring-Kata) de Emily Bache.
