@@ -1,0 +1,14 @@
+target/
+.gradle/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+*.class
+*.jar
+*.war
+*.ear
+*.pdf
+hs_err_pid*
